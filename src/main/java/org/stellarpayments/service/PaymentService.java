@@ -8,15 +8,16 @@ import org.stellar.sdk.exception.BadResponseException;
 import org.stellar.sdk.exception.NetworkException;
 import org.stellar.sdk.operations.PaymentOperation;
 import org.stellar.sdk.requests.RequestBuilder;
+import org.stellar.sdk.requests.SSEStream;
 import org.stellar.sdk.responses.Page;
 import org.stellar.sdk.responses.TransactionResponse;
 import org.stellar.sdk.responses.operations.OperationResponse;
+import org.stellarpayments.listener.PaymentEventListener;
 import org.stellarpayments.response.PaymentMapper;
 import org.stellarpayments.response.PaymentResponse;
 import org.stellarpayments.response.Response;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,7 @@ public class PaymentService {
     private final KeyPair sourceKeyPair;
     private final TransactionBuilderAccount sourceAccount;
     private final Network network = Network.TESTNET;
+    private volatile SSEStream<OperationResponse> currentStream;
 
     public PaymentService() throws IllegalAccessException {
         this.server = new Server("https://horizon-testnet.stellar.org");
@@ -96,6 +98,36 @@ public class PaymentService {
         }
         System.out.println(response);
         return response;
+    }
+
+    public synchronized void startNotificationService() {
+        if(currentStream != null) {
+            System.out.println("Notification service already running.");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                System.out.println("Listening for payments...");
+                currentStream = server.payments()
+                        .forAccount(sourceKeyPair.getAccountId())
+                        .cursor("now")
+                        .stream(new PaymentEventListener());
+            } catch (Exception e) {
+                System.err.println("Error starting payment listener: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    public synchronized void stopNotificationService() {
+        if(currentStream != null) {
+            System.out.println("Notification service stopped.");
+            currentStream.close();
+            currentStream = null;
+        } else {
+            System.out.println("No active notification service found.");
+        }
     }
 
     @PreDestroy

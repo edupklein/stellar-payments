@@ -28,4 +28,16 @@ public class PaymentController {
     public Response<List<PaymentResponse>> listPayments() {
         return paymentService.listPayments();
     }
+
+    @GetMapping("/notifications/start")
+    public Response<String> startNotifications() {
+        paymentService.startNotificationService();
+        return new Response<>(true, "Notifications service started (check console logs)", null);
+    }
+
+    @GetMapping("/notifications/stop")
+    public Response<String> stopNotifications() {
+        paymentService.stopNotificationService();
+        return new Response<>(true, "Notifications service stop", null);
+    }
 }
